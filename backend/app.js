@@ -23,6 +23,10 @@ app.use(cors())
 app.use(express.json())
 app.use(middleware.requestLogger)
 
+app.get('/', (request, response) => {
+  response.send('<h1>Lista de blog</h1><p>Use /api/blogs</p>')
+})
+
 app.use('/api/blogs', blogsRouter)
 
 app.use(middleware.unknownEndpoint)
