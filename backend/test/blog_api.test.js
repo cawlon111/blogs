@@ -4,39 +4,20 @@ const mongoose = require('mongoose')
 const supertest = require('supertest')
 const app = require('../app')
 const Blog = require('../models/blog')
+const helper = require('./test_helper')
 
 const api = supertest(app)
 
-// Datos de prueba iniciales
-const initialBlogs = [
-  {
-    title: 'Go To Statement Considered Harmful',
-    author: 'Edsger W. Dijkstra',
-    url: 'https://homepages.cwi.nl/~storm/teaching/reader/Dijkstra68.pdf',
-    likes: 5,
-  },
-  {
-    title: 'Canonical string reduction',
-    author: 'Edsger W. Dijkstra',
-    url: 'https://www.cs.utexas.edu/~EWD/transcriptions/EWD08xx/EWD808.html',
-    likes: 12,
-  },
-  {
-    title: 'First class tests',
-    author: 'Robert C. Martin',
-    url: 'https://blog.cleancoder.com/uncle-bob/2017/05/05/TestDefinitions.htmll',
-    likes: 10,
-  }
-]
-
-// Limpiar y llenar la base de datos antes de cada prueba
+// ✅ OPTIMIZADO: Usa Promise.all para ejecutar saves en paralelo
 beforeEach(async () => {
   await Blog.deleteMany({})
   
-  for (let blog of initialBlogs) {
-    let blogObject = new Blog(blog)
-    await blogObject.save()
-  }
+  const savePromises = helper.initialBlogs.map(blog => {
+    const blogObject = new Blog(blog)
+    return blogObject.save()
+  })
+  
+  await Promise.all(savePromises)
 })
 
 describe('GET /api/blogs', () => {
@@ -50,7 +31,7 @@ describe('GET /api/blogs', () => {
 
   test('returns the correct number of blogs', async () => {
     const response = await api.get('/api/blogs')
-    assert.strictEqual(response.body.length, initialBlogs.length)
+    assert.strictEqual(response.body.length, helper.initialBlogs.length)
   })
 
   test('blogs have an id property (not _id)', async () => {
@@ -59,6 +40,32 @@ describe('GET /api/blogs', () => {
       assert.ok(blog.id)
       assert.strictEqual(blog._id, undefined)
     })
+  })
+
+  test('a specific blog can be viewed', async () => {
+    const blogsAtStart = await helper.blogsInDb()
+    const blogToView = blogsAtStart[0]
+
+    const resultBlog = await api
+      .get(`/api/blogs/${blogToView.id}`)
+      .expect(200)
+      .expect('Content-Type', /application\/json/)
+
+    assert.deepStrictEqual(resultBlog.body, blogToView)
+  })
+
+  test('returns 404 if blog does not exist', async () => {
+    const nonExistingId = await helper.nonExistingId()
+    
+    await api
+      .get(`/api/blogs/${nonExistingId}`)
+      .expect(404)
+  })
+
+  test('returns 400 if id is malformed', async () => {
+    await api
+      .get('/api/blogs/12345')
+      .expect(400)
   })
 })
 
@@ -78,10 +85,10 @@ describe('POST /api/blogs', () => {
       .expect(201)
       .expect('Content-Type', /application\/json/)
 
-    const response = await api.get('/api/blogs')
-    assert.strictEqual(response.body.length, initialBlogs.length + 1)
+    const blogsAtEnd = await helper.blogsInDb()
+    assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length + 1)
     
-    const titles = response.body.map(blog => blog.title)
+    const titles = blogsAtEnd.map(blog => blog.title)
     assert.ok(titles.includes('Test Blog'))
   })
 
@@ -111,6 +118,9 @@ describe('POST /api/blogs', () => {
       .post('/api/blogs')
       .send(newBlog)
       .expect(400)
+
+    const blogsAtEnd = await helper.blogsInDb()
+    assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length)
   })
 
   test('returns 400 if url is missing', async () => {
@@ -124,24 +134,42 @@ describe('POST /api/blogs', () => {
       .post('/api/blogs')
       .send(newBlog)
       .expect(400)
+
+    const blogsAtEnd = await helper.blogsInDb()
+    assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length)
   })
 })
 
 describe('DELETE /api/blogs/:id', () => {
   
   test('deletes a blog successfully', async () => {
-    const blogsAtStart = await api.get('/api/blogs')
-    const blogToDelete = blogsAtStart.body[0]
+    const blogsAtStart = await helper.blogsInDb()
+    const blogToDelete = blogsAtStart[0]
 
     await api
       .delete(`/api/blogs/${blogToDelete.id}`)
       .expect(204)
 
-    const blogsAtEnd = await api.get('/api/blogs')
-    assert.strictEqual(blogsAtEnd.body.length, initialBlogs.length - 1)
+    const blogsAtEnd = await helper.blogsInDb()
+    assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length - 1)
 
-    const ids = blogsAtEnd.body.map(blog => blog.id)
+    const ids = blogsAtEnd.map(blog => blog.id)
     assert.ok(!ids.includes(blogToDelete.id))
+  })
+
+  test('a blog can be deleted and content is removed', async () => {
+    const blogsAtStart = await helper.blogsInDb()
+    const blogToDelete = blogsAtStart[0]
+
+    await api
+      .delete(`/api/blogs/${blogToDelete.id}`)
+      .expect(204)
+
+    const blogsAtEnd = await helper.blogsInDb()
+    const titles = blogsAtEnd.map(blog => blog.title)
+    
+    assert.ok(!titles.includes(blogToDelete.title))
+    assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length - 1)
   })
 
   test('returns 400 if id is malformed', async () => {
@@ -154,8 +182,8 @@ describe('DELETE /api/blogs/:id', () => {
 describe('PUT /api/blogs/:id', () => {
   
   test('updates a blog successfully', async () => {
-    const blogsAtStart = await api.get('/api/blogs')
-    const blogToUpdate = blogsAtStart.body[0]
+    const blogsAtStart = await helper.blogsInDb()
+    const blogToUpdate = blogsAtStart[0]
 
     const updatedData = {
       title: blogToUpdate.title,

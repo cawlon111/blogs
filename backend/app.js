@@ -9,11 +9,16 @@ const mongoose = require('mongoose')
 
 mongoose.set('strictQuery', false)
 
-logger.info('connecting to', config.MONGODB_URI)
+// Solo mostrar logs si no es test
+if (process.env.NODE_ENV !== 'test') {
+  logger.info('connecting to', config.MONGODB_URI)
+}
 
 mongoose.connect(config.MONGODB_URI)
   .then(() => {
-    logger.info('connected to MongoDB')
+    if (process.env.NODE_ENV !== 'test') {
+      logger.info('connected to MongoDB')
+    }
   })
   .catch((error) => {
     logger.error('error connecting to MongoDB:', error.message)
@@ -24,7 +29,7 @@ app.use(express.json())
 app.use(middleware.requestLogger)
 
 app.get('/', (request, response) => {
-  response.send('<h1>Lista de blog</h1><p>Use /api/blogs</p>')
+  response.send('<h1>Blog List API</h1><p>Use /api/blogs</p>')
 })
 
 app.use('/api/blogs', blogsRouter)
