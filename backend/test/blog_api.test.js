@@ -2,23 +2,48 @@ const { test, describe, after, beforeEach } = require('node:test')
 const assert = require('node:assert')
 const mongoose = require('mongoose')
 const supertest = require('supertest')
+const bcrypt = require('bcryptjs')
 const app = require('../app')
 const Blog = require('../models/blog')
+const User = require('../models/user')
 const helper = require('./test_helper')
 
 const api = supertest(app)
 
-// ✅ OPTIMIZADO: Usa Promise.all para ejecutar saves en paralelo
+// Variable global para el token
+let authToken = null
+
+// Limpiar y llenar la base de datos antes de cada prueba
 beforeEach(async () => {
   await Blog.deleteMany({})
+  await User.deleteMany({})
   
-  const savePromises = helper.initialBlogs.map(blog => {
-    const blogObject = new Blog(blog)
-    return blogObject.save()
+  // Crear usuario de prueba
+  const user = new User({
+    username: 'testuser',
+    name: 'Test User',
+    passwordHash: await bcrypt.hash('password123', 10)
   })
-  
-  await Promise.all(savePromises)
+  await user.save()
+
+  // Obtener token para este usuario
+  const loginResponse = await api
+    .post('/api/login')
+    .send({ username: 'testuser', password: 'password123' })
+  authToken = loginResponse.body.token
+
+  // Guardar blogs con referencia al usuario (sin guardar la referencia en el usuario)
+  for (const blog of helper.initialBlogs) {
+    const blogObject = new Blog({
+      ...blog,
+      user: user._id
+    })
+    await blogObject.save()
+  }
 })
+
+// Función para obtener token (devuelve el guardado)
+const getToken = () => authToken
 
 describe('GET /api/blogs', () => {
   
@@ -51,7 +76,11 @@ describe('GET /api/blogs', () => {
       .expect(200)
       .expect('Content-Type', /application\/json/)
 
-    assert.deepStrictEqual(resultBlog.body, blogToView)
+    assert.strictEqual(resultBlog.body.title, blogToView.title)
+    assert.strictEqual(resultBlog.body.author, blogToView.author)
+    assert.strictEqual(resultBlog.body.url, blogToView.url)
+    assert.strictEqual(resultBlog.body.likes, blogToView.likes)
+    assert.ok(resultBlog.body.id)
   })
 
   test('returns 404 if blog does not exist', async () => {
@@ -71,7 +100,9 @@ describe('GET /api/blogs', () => {
 
 describe('POST /api/blogs', () => {
   
-  test('creates a new blog successfully', async () => {
+  test('creates a new blog successfully with token', async () => {
+    const token = getToken()
+    
     const newBlog = {
       title: 'Test Blog',
       author: 'Test Author',
@@ -81,6 +112,7 @@ describe('POST /api/blogs', () => {
 
     await api
       .post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(201)
       .expect('Content-Type', /application\/json/)
@@ -92,7 +124,24 @@ describe('POST /api/blogs', () => {
     assert.ok(titles.includes('Test Blog'))
   })
 
+  test('fails with 401 if no token provided', async () => {
+    const newBlog = {
+      title: 'Test Blog',
+      author: 'Test Author',
+      url: 'https://test.com',
+      likes: 7
+    }
+
+    await api
+      .post('/api/blogs')
+      .send(newBlog)
+      .expect(401)
+      .expect('Content-Type', /application\/json/)
+  })
+
   test('if likes is missing, defaults to 0', async () => {
+    const token = getToken()
+    
     const newBlog = {
       title: 'Blog Without Likes',
       author: 'Test Author',
@@ -101,6 +150,7 @@ describe('POST /api/blogs', () => {
 
     const response = await api
       .post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(201)
 
@@ -108,6 +158,8 @@ describe('POST /api/blogs', () => {
   })
 
   test('returns 400 if title is missing', async () => {
+    const token = getToken()
+    
     const newBlog = {
       author: 'Test Author',
       url: 'https://test.com',
@@ -116,6 +168,7 @@ describe('POST /api/blogs', () => {
 
     await api
       .post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(400)
 
@@ -124,6 +177,8 @@ describe('POST /api/blogs', () => {
   })
 
   test('returns 400 if url is missing', async () => {
+    const token = getToken()
+    
     const newBlog = {
       title: 'Blog Without URL',
       author: 'Test Author',
@@ -132,6 +187,7 @@ describe('POST /api/blogs', () => {
 
     await api
       .post('/api/blogs')
+      .set('Authorization', `Bearer ${token}`)
       .send(newBlog)
       .expect(400)
 
@@ -142,12 +198,15 @@ describe('POST /api/blogs', () => {
 
 describe('DELETE /api/blogs/:id', () => {
   
-  test('deletes a blog successfully', async () => {
+  test('deletes a blog successfully with token', async () => {
+    const token = getToken()
+    
     const blogsAtStart = await helper.blogsInDb()
     const blogToDelete = blogsAtStart[0]
 
     await api
       .delete(`/api/blogs/${blogToDelete.id}`)
+      .set('Authorization', `Bearer ${token}`)
       .expect(204)
 
     const blogsAtEnd = await helper.blogsInDb()
@@ -157,24 +216,21 @@ describe('DELETE /api/blogs/:id', () => {
     assert.ok(!ids.includes(blogToDelete.id))
   })
 
-  test('a blog can be deleted and content is removed', async () => {
+  test('fails with 401 if no token provided', async () => {
     const blogsAtStart = await helper.blogsInDb()
     const blogToDelete = blogsAtStart[0]
 
     await api
       .delete(`/api/blogs/${blogToDelete.id}`)
-      .expect(204)
-
-    const blogsAtEnd = await helper.blogsInDb()
-    const titles = blogsAtEnd.map(blog => blog.title)
-    
-    assert.ok(!titles.includes(blogToDelete.title))
-    assert.strictEqual(blogsAtEnd.length, helper.initialBlogs.length - 1)
+      .expect(401)
   })
 
   test('returns 400 if id is malformed', async () => {
+    const token = getToken()
+    
     await api
       .delete('/api/blogs/12345')
+      .set('Authorization', `Bearer ${token}`)
       .expect(400)
   })
 })
@@ -208,7 +264,6 @@ describe('PUT /api/blogs/:id', () => {
   })
 })
 
-// Cerrar la conexión de mongoose después de todas las pruebas
 after(async () => {
   await mongoose.connection.close()
 })

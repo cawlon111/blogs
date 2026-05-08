@@ -1,6 +1,7 @@
 const Blog = require('../models/blog')
+const User = require('../models/user')
 
-// Datos iniciales para pruebas
+// Datos iniciales para pruebas de blogs
 const initialBlogs = [
   {
     title: 'Go To Statement Considered Harmful',
@@ -22,10 +23,25 @@ const initialBlogs = [
   }
 ]
 
+// Usuario de prueba
+const initialUsers = [
+  {
+    username: 'testuser',
+    name: 'Test User',
+    password: 'password123'
+  }
+]
+
 // Obtener todos los blogs de la base de datos
 const blogsInDb = async () => {
   const blogs = await Blog.find({})
   return blogs.map(blog => blog.toJSON())
+}
+
+// Obtener todos los usuarios de la base de datos
+const usersInDb = async () => {
+  const users = await User.find({})
+  return users.map(user => user.toJSON())
 }
 
 // Crear un ID que no existe en la base de datos
@@ -43,6 +59,8 @@ const nonExistingId = async () => {
 
 module.exports = {
   initialBlogs,
+  initialUsers,
   blogsInDb,
+  usersInDb,
   nonExistingId
 }

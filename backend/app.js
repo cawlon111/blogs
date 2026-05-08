@@ -3,6 +3,8 @@ const express = require('express')
 const app = express()
 const cors = require('cors')
 const blogsRouter = require('./controllers/blogs')
+const usersRouter = require('./controllers/users')
+const loginRouter = require('./controllers/login')
 const middleware = require('./utils/middleware')
 const logger = require('./utils/logger')
 const mongoose = require('mongoose')
@@ -29,10 +31,13 @@ app.use(express.json())
 app.use(middleware.requestLogger)
 
 app.get('/', (request, response) => {
-  response.send('<h1>Blog List API</h1><p>Use /api/blogs</p>')
+  response.send('<h1>Blog List API</h1><p>Use /api/blogs, /api/users, /api/login</p>')
 })
 
+// Rutas
 app.use('/api/blogs', blogsRouter)
+app.use('/api/users', usersRouter)
+app.use('/api/login', loginRouter)
 
 app.use(middleware.unknownEndpoint)
 app.use(middleware.errorHandler)
