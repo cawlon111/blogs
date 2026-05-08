@@ -7,7 +7,7 @@
     "start": "cross-env NODE_ENV=production node index.js",
     "dev": "cross-env NODE_ENV=development nodemon index.js",
     "test": "cross-env NODE_ENV=test node --test --test-concurrency=1",
-    "build:ui": "rimraf dist && cd ../frontend && npm run build && npx copyfiles -u 1 dist/**/* ../backend/dist",
+    "build:ui": "cd ../frontend && npm run build && cp -r dist ../backend/",
     "deploy:full": "npm run build:ui && git add . && git commit -m uibuild && git push"
   },
   "repository": {
