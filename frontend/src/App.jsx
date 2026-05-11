@@ -1,16 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import blogService from './services/blogs'
 import loginService from './services/login'
 import LoginForm from './components/LoginForm'
 import Blog from './components/Blog'
 import BlogForm from './components/BlogForm'
 import Notification from './components/Notification'
+import Togglable from './components/Togglable'
 
 const App = () => {
   const [blogs, setBlogs] = useState([])
   const [user, setUser] = useState(null)
   const [notification, setNotification] = useState(null)
   const [errorMessage, setErrorMessage] = useState(null)
+
+  const blogFormRef = useRef()
 
   useEffect(() => {
     blogService.getAll().then(blogs =>
@@ -43,25 +46,26 @@ const App = () => {
       window.localStorage.setItem('loggedBlogAppUser', JSON.stringify(user))
       blogService.setToken(user.token)
       setUser(user)
-      showNotification('Login successful')
-    } catch (exception) {
-      showNotification('Wrong username or password', true)
+      showNotification('Inicio de sesión exitoso')
+    } catch {
+      showNotification('Usuario o contraseña incorrectos', true)
     }
   }
 
   const handleLogout = () => {
     window.localStorage.removeItem('loggedBlogAppUser')
     setUser(null)
-    showNotification('Logged out')
+    showNotification('Sesión cerrada')
   }
 
   const createBlog = async (blogObject) => {
     try {
       const returnedBlog = await blogService.create(blogObject)
       setBlogs(blogs.concat(returnedBlog))
-      showNotification(`A new blog "${returnedBlog.title}" by ${returnedBlog.author} added`)
-    } catch (exception) {
-      showNotification('Failed to add blog', true)
+      blogFormRef.current.toggleVisibility()
+      showNotification(`Nuevo blog "${returnedBlog.title}" por ${returnedBlog.author} añadido`)
+    } catch {
+      showNotification('Error al añadir el blog', true)
     }
   }
 
@@ -75,20 +79,20 @@ const App = () => {
       const returnedBlog = await blogService.update(blog.id, updatedBlog)
       setBlogs(blogs.map(b => b.id === blog.id ? { ...returnedBlog, user: blog.user } : b)
         .sort((a, b) => b.likes - a.likes))
-      showNotification(`Liked "${blog.title}"`)
-    } catch (exception) {
-      showNotification('Failed to like blog', true)
+      showNotification(`Te gusta "${blog.title}"`)
+    } catch {
+      showNotification('Error al dar like', true)
     }
   }
 
   const handleDelete = async (blog) => {
-    if (window.confirm(`Remove blog "${blog.title}" by ${blog.author}?`)) {
+    if (window.confirm(`¿Eliminar el blog "${blog.title}" por ${blog.author}?`)) {
       try {
         await blogService.remove(blog.id)
         setBlogs(blogs.filter(b => b.id !== blog.id))
-        showNotification(`Blog "${blog.title}" removed`)
-      } catch (exception) {
-        showNotification('Failed to delete blog', true)
+        showNotification(`Blog "${blog.title}" eliminado`)
+      } catch {
+        showNotification('Error al eliminar el blog', true)
       }
     }
   }
@@ -96,7 +100,7 @@ const App = () => {
   if (user === null) {
     return (
       <div>
-        <h2>Log in to application</h2>
+        <h2>Iniciar sesión en la aplicación</h2>
         <Notification message={errorMessage || notification} type={errorMessage ? 'error' : 'notification'} />
         <LoginForm handleLogin={handleLogin} />
       </div>
@@ -107,8 +111,12 @@ const App = () => {
     <div>
       <h2>blogs</h2>
       <Notification message={errorMessage || notification} type={errorMessage ? 'error' : 'notification'} />
-      <p>{user.name} logged in <button onClick={handleLogout}>logout</button></p>
-      <BlogForm createBlog={createBlog} />
+      <p>{user.name} ha iniciado sesión <button onClick={handleLogout}>cerrar sesión</button></p>
+
+      <Togglable buttonLabel="crear nuevo blog" ref={blogFormRef}>
+        <BlogForm createBlog={createBlog} />
+      </Togglable>
+
       {blogs.map(blog =>
         <Blog
           key={blog.id}
