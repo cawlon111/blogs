@@ -99,33 +99,58 @@ const App = () => {
 
   if (user === null) {
     return (
-      <div>
-        <h2>Iniciar sesión en la aplicación</h2>
-        <Notification message={errorMessage || notification} type={errorMessage ? 'error' : 'notification'} />
-        <LoginForm handleLogin={handleLogin} />
+      <div className="app-container">
+        <div className="app-header">
+          <h1>📝 Blog App</h1>
+          <p>Comparte tus ideas con el mundo</p>
+        </div>
+        <div className="app-content">
+          <h2>Iniciar sesión en la aplicación</h2>
+          <Notification message={errorMessage || notification} type={errorMessage ? 'error' : 'notification'} />
+          <LoginForm handleLogin={handleLogin} />
+        </div>
+        <div className="app-footer">
+          <em>Blog App - Full Stack Open</em>
+        </div>
       </div>
     )
   }
 
   return (
-    <div>
-      <h2>blogs</h2>
-      <Notification message={errorMessage || notification} type={errorMessage ? 'error' : 'notification'} />
-      <p>{user.name} ha iniciado sesión <button onClick={handleLogout}>cerrar sesión</button></p>
+    <div className="app-container">
+      <div className="app-header">
+        <h1>📝 Blog App</h1>
+        <p>Comparte tus ideas con el mundo</p>
+      </div>
+      
+      <div className="app-content">
+        <div className="user-info">
+          <span className="user-name">{user.name} ha iniciado sesión</span>
+          <button onClick={handleLogout} className="btn-danger">cerrar sesión</button>
+        </div>
 
-      <Togglable buttonLabel="crear nuevo blog" ref={blogFormRef}>
-        <BlogForm createBlog={createBlog} />
-      </Togglable>
+        <Notification message={errorMessage || notification} type={errorMessage ? 'error' : 'notification'} />
 
-      {blogs.map(blog =>
-        <Blog
-          key={blog.id}
-          blog={blog}
-          handleLike={handleLike}
-          handleDelete={handleDelete}
-          user={user}
-        />
-      )}
+        <Togglable buttonLabel="crear nuevo blog" ref={blogFormRef}>
+          <BlogForm createBlog={createBlog} />
+        </Togglable>
+
+        <div className="blogs-list">
+          {blogs.map(blog =>
+            <Blog
+              key={blog.id}
+              blog={blog}
+              handleLike={handleLike}
+              handleDelete={handleDelete}
+              user={user}
+            />
+          )}
+        </div>
+      </div>
+      
+      <div className="app-footer">
+        <em>Blog App - Full Stack Open</em>
+      </div>
     </div>
   )
 }
