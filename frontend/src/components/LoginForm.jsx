@@ -12,28 +12,34 @@ const LoginForm = ({ handleLogin }) => {
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <div>
-        <label htmlFor="username-input">usuario</label>
+    <form onSubmit={onSubmit} className="login-form">
+      <div className="form-group">
+        <label htmlFor="username-input">👤 Usuario</label>
         <input
           id="username-input"
           type="text"
           value={username}
           name="Username"
+          placeholder="Escribe tu usuario"
+          autoComplete="username"
           onChange={({ target }) => setUsername(target.value)}
         />
       </div>
-      <div>
-        <label htmlFor="password-input">contraseña</label>
+      <div className="form-group">
+        <label htmlFor="password-input">🔒 Contraseña</label>
         <input
           id="password-input"
           type="password"
           value={password}
           name="Password"
+          placeholder="Escribe tu contraseña"
+          autoComplete="current-password"
           onChange={({ target }) => setPassword(target.value)}
         />
       </div>
-      <button type="submit">iniciar sesión</button>
+      <button type="submit" className="btn-primary">
+        Iniciar sesión
+      </button>
     </form>
   )
 }
